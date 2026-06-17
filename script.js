@@ -4,251 +4,239 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Prevent pixel blurring
+// Ngăn chặn việc làm nhòe điểm ảnh (pixel art smoothing)
 ctx.imageSmoothingEnabled = false;
 
-let groundY = canvas.height * 0.85; // Ground level
+let groundY = canvas.height * 0.85; // Cột mốc mặt đất
+
+// Khởi tạo các hệ thống Core trong Game
+const assetManager = new AssetManager();
+const input = new InputHandler();
+const background = new Background(canvas, assetManager);
+
+// Tải toàn bộ hoạt ảnh của nhân vật Knight 1 (Player) và Knight 2 (Monster)
+const animations = [
+    'Idle', 'Walk', 'Run', 'Jump', 'Attack 1', 'Attack 2', 'Attack 3',
+    'Defend', 'Protect', 'Hurt', 'Dead', 'Run+Attack'
+];
+
+animations.forEach(anim => {
+    assetManager.loadImage(`Knight1_${anim}`, `assets/Character/Knight_1/${anim}.png`);
+    assetManager.loadImage(`Knight2_${anim}`, `assets/Character/Knight_2/${anim}.png`);
+});
+
+// Khởi tạo nhân vật chính (Player) ở chính giữa màn hình và đứng trên mặt đất
+const player = new Player(canvas.width / 2, groundY, assetManager);
+
+// Khởi tạo quái vật (Monster) ở phía bên phải màn hình
+const monster = new Monster(canvas.width * 0.75, groundY, assetManager);
+
+// Quản lý trạng thái khởi chạy game
+let gameStarted = false;
+const startScreen = document.getElementById('startScreen');
+const startButton = document.getElementById('startButton');
+
+startButton.addEventListener('click', () => {
+    startScreen.classList.add('hidden');
+    gameStarted = true;
+});
 
 window.addEventListener('resize', () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     ctx.imageSmoothingEnabled = false;
     groundY = canvas.height * 0.85;
-});
-
-// Load Images
-const images = {};
-const animations = [
-    'Idle', 'Walk', 'Run', 'Jump', 'Attack 1', 'Attack 2', 'Attack 3', 
-    'Defend', 'Protect', 'Hurt', 'Dead', 'Run+Attack'
-];
-
-let imagesLoaded = 0;
-const totalImagesToLoad = animations.length + 1;
-
-animations.forEach(anim => {
-    const img = new Image();
-    img.src = `assets/Character/Knight_1/${anim}.png`;
-    img.onload = () => {
-        imagesLoaded++;
-    };
-    images[anim] = img;
-});
-
-const bgImage = new Image();
-bgImage.src = 'assets/map/nature_1/origbig.png';
-bgImage.onload = () => {
-    imagesLoaded++;
-};
-
-// Input handling
-const keys = {
-    a: false, d: false, w: false, s: false, 
-    ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false,
-    Shift: false, ' ': false, q: false, e: false
-};
-
-window.addEventListener('keydown', (e) => {
-    if (keys.hasOwnProperty(e.key) || e.key === ' ') keys[e.key] = true;
-    if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true;
-});
-
-window.addEventListener('keyup', (e) => {
-    if (keys.hasOwnProperty(e.key) || e.key === ' ') keys[e.key] = false;
-    if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false;
-});
-
-class Player {
-    constructor() {
-        this.x = canvas.width / 2;
-        this.y = groundY;
-        this.vx = 0;
-        this.vy = 0;
-        this.speed = 3;
-        this.runSpeed = 6;
-        this.gravity = 0.5;
-        this.jumpStrength = -10;
-        
-        this.scale = 3; // Scale up the sprite
-        
-        this.currentState = 'Idle';
-        this.facingRight = true;
-        
-        this.frameX = 0;
-        this.gameFrame = 0;
-        this.staggerFrames = 6; // Animation speed
-        
-        this.isAttacking = false;
-        this.isDead = false;
-        this.isDefending = false;
-    }
     
-    draw(context) {
-        if (!images[this.currentState] || !images[this.currentState].complete || images[this.currentState].naturalWidth === 0) return;
-        
-        const img = images[this.currentState];
-        // Assuming the sprite sheet has frames laid out horizontally and each frame is a square (height = frame width)
-        // If they are not square, assuming width is a multiple of height is common for these assets.
-        // Usually, Craftpix sprites are roughly square or at least a fixed width per frame.
-        // Let's assume frameWidth = img.naturalHeight, so numFrames = img.naturalWidth / img.naturalHeight.
-        let frameWidth = img.naturalHeight;
-        let numFrames = Math.floor(img.naturalWidth / frameWidth);
-        
-        // Failsafe in case frameWidth is different
-        if (numFrames === 0) numFrames = 1;
-
-        if (this.frameX >= numFrames) {
-            if (this.isAttacking || this.currentState === 'Dead' || this.currentState === 'Hurt') {
-                if (this.currentState === 'Dead') {
-                    this.frameX = numFrames - 1; // Stay dead
-                } else {
-                    this.isAttacking = false;
-                    this.frameX = 0;
-                    this.currentState = 'Idle';
-                }
-            } else {
-                this.frameX = 0;
-            }
-        }
-        
-        // Draw the current frame
-        context.save();
-        context.translate(this.x, this.y);
-        if (!this.facingRight) {
-            context.scale(-1, 1);
-        }
-        
-        // Draw shadow
-        context.fillStyle = 'rgba(0,0,0,0.3)';
-        context.beginPath();
-        context.ellipse(0, 0, 30, 8, 0, 0, Math.PI * 2);
-        context.fill();
-
-        context.drawImage(
-            img, 
-            this.frameX * frameWidth, 0, frameWidth, img.naturalHeight, 
-            -frameWidth * this.scale / 2, -img.naturalHeight * this.scale + (img.naturalHeight * this.scale * 0.1), // Adjusted for alignment
-            frameWidth * this.scale, img.naturalHeight * this.scale
-        );
-        
-        context.restore();
-        
-        if (this.gameFrame % this.staggerFrames === 0) {
-            if (this.currentState === 'Dead' && this.frameX === numFrames - 1) {
-                // Do not loop dead animation
-            } else {
-                this.frameX++;
-            }
-        }
-        this.gameFrame++;
+    // Đồng bộ lại điểm tuần tra của quái vật theo màn hình mới
+    if (monster) {
+        monster.patrolStartX = canvas.width * 0.75;
     }
-    
-    update() {
-        if (this.isDead) return;
+});
 
-        // Reset state
-        if (!this.isAttacking) {
-            this.isDefending = false;
-            
-            // Defend
-            if (keys.s || keys.ArrowDown) {
-                this.isDefending = true;
-                this.currentState = 'Defend';
-                this.vx = 0;
-            } 
-            // Attack
-            else if (keys.q) {
-                this.isAttacking = true;
-                this.currentState = 'Attack 1';
-                this.frameX = 0;
-                this.vx = 0;
-            }
-            else if (keys.w) {
-                this.isAttacking = true;
-                this.currentState = 'Attack 2';
-                this.frameX = 0;
-                this.vx = 0;
-            }
-            else if (keys.e) {
-                this.isAttacking = true;
-                this.currentState = 'Attack 3';
-                this.frameX = 0;
-                this.vx = 0;
-            }
-            // Move
-            else if (keys.a || keys.ArrowLeft) {
-                this.facingRight = false;
-                if (keys.Shift) {
-                    this.vx = -this.runSpeed;
-                    this.currentState = 'Run';
-                } else {
-                    this.vx = -this.speed;
-                    this.currentState = 'Walk';
-                }
-            } else if (keys.d || keys.ArrowRight) {
-                this.facingRight = true;
-                if (keys.Shift) {
-                    this.vx = this.runSpeed;
-                    this.currentState = 'Run';
-                } else {
-                    this.vx = this.speed;
-                    this.currentState = 'Walk';
-                }
-            } else {
-                this.vx = 0;
-                this.currentState = 'Idle';
-            }
+/**
+ * Xử lý va chạm chiến đấu, tính sát thương và cộng điểm số
+ * @param {Player} player 
+ * @param {Monster} monster 
+ */
+function handleCombatCollisions(player, monster) {
+    if (player.isDead) return;
 
-            // Jump
-            if ((keys[' '] || keys.ArrowUp) && this.y === groundY && !this.isDefending) {
-                this.vy = this.jumpStrength;
-                this.currentState = 'Jump';
+    // Tính toán khoảng cách giữa Player và Monster
+    const distance = Math.abs(player.x - monster.x);
+    const attackRange = 110; // Tầm chém hiệu quả của cả 2 bên
+
+    // --- PLAYER TẤN CÔNG MONSTER ---
+    // Điều kiện: Đang đánh, chưa gây sát thương đợt này, quái vật còn sống và trong cự ly tấn công
+    if (player.isAttacking && !player.hasDealtDamage && !monster.isDead && distance < attackRange) {
+        // Kiểm tra xem hướng của người chơi có quay về phía quái vật hay không
+        const isFacingMonster = (monster.x > player.x && player.facingRight) || (monster.x < player.x && !player.facingRight);
+        
+        if (isFacingMonster) {
+            let dmg = 10;
+            // Tăng sát thương dựa theo đòn đánh Attack 1, 2, 3
+            if (player.currentState === 'Attack 2') dmg = 15;
+            if (player.currentState === 'Attack 3') dmg = 20;
+
+            const isKilled = monster.takeDamage(dmg, player.x);
+            player.hasDealtDamage = true; // Chỉ tính sát thương một lần cho mỗi lượt chém
+
+            if (isKilled) {
+                player.score += 10; // Tiêu diệt quái cộng 10 điểm
             }
         }
-        
-        // Physics
-        this.x += this.vx;
-        this.y += this.vy;
-        
-        // Gravity
-        if (this.y < groundY) {
-            this.vy += this.gravity;
-            if (!this.isAttacking && !this.isDefending) this.currentState = 'Jump';
-        } else {
-            this.vy = 0;
-            this.y = groundY;
+    }
+
+    // --- MONSTER TẤN CÔNG PLAYER ---
+    // Điều kiện: Quái đang đánh, chưa gây sát thương đợt này, quái còn sống và trong cự ly tấn công
+    if (monster.isAttacking && !monster.hasDealtDamage && !monster.isDead && distance < attackRange) {
+        // Kiểm tra xem hướng của quái vật có quay về phía người chơi hay không
+        const isFacingPlayer = (player.x > monster.x && monster.facingRight) || (player.x < monster.x && !monster.facingRight);
+
+        if (isFacingPlayer) {
+            const dmg = 12; // Sát thương của quái vật lên người chơi
+            const result = player.takeDamage(dmg, monster.x);
+            monster.hasDealtDamage = true; // Chỉ nhận sát thương 1 lần cho mỗi lượt chém của quái
+
+            if (result === 'parry') {
+                // Phản đòn thành công -> Làm choáng quái vật trong 2.5 giây (2500ms)
+                monster.triggerStun(2500);
+            }
         }
-        
-        // Screen bounds
-        if (this.x < 50) this.x = 50;
-        if (this.x > canvas.width - 50) this.x = canvas.width - 50;
-        
-        // Adjust animation speed based on state
-        if (this.currentState === 'Run') this.staggerFrames = 4;
-        else if (this.currentState === 'Walk') this.staggerFrames = 6;
-        else if (this.currentState === 'Idle') this.staggerFrames = 8;
-        else this.staggerFrames = 5;
     }
 }
 
-const player = new Player();
+/**
+ * Vẽ Giao diện Thông số của Game (HUD)
+ */
+function drawHUD(ctx, player, monster) {
+    // 1. Vẽ Thanh máu Player (góc trên bên trái)
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 2;
+    ctx.fillStyle = '#333';
+    ctx.fillRect(20, 20, 200, 24);
+    
+    // Tỷ lệ HP Player
+    const hpRatio = player.hp / player.maxHp;
+    ctx.fillStyle = hpRatio > 0.4 ? '#4caf50' : hpRatio > 0.15 ? '#ffeb3b' : '#f44336';
+    ctx.fillRect(22, 22, 196 * hpRatio, 20);
+    ctx.strokeRect(20, 20, 200, 24);
 
+    // Chữ số HP
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 12px Arial';
+    ctx.fillText(`HP: ${player.hp}/${player.maxHp}`, 30, 36);
+
+    // 2. Vẽ Điểm số Player (góc trên bên phải)
+    ctx.fillStyle = '#ffeb3b';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'right';
+    ctx.fillText(`SCORE: ${player.score}`, canvas.width - 20, 40);
+    ctx.textAlign = 'left'; // Trả lại mặc định
+
+    // 3. Vẽ Thanh máu Quái vật (trực tiếp trên đầu quái vật)
+    if (!monster.isDead) {
+        const mBarWidth = 70;
+        const mBarHeight = 6;
+        const mBarX = monster.x - mBarWidth / 2;
+        const mBarY = monster.y - 120;
+
+        ctx.fillStyle = '#333';
+        ctx.fillRect(mBarX, mBarY, mBarWidth, mBarHeight);
+        
+        const mHpRatio = monster.hp / monster.maxHp;
+        ctx.fillStyle = '#f44336'; // Màu đỏ cho máu quái vật
+        ctx.fillRect(mBarX + 1, mBarY + 1, (mBarWidth - 2) * mHpRatio, mBarHeight - 2);
+        ctx.strokeRect(mBarX, mBarY, mBarWidth, mBarHeight);
+    }
+
+    // --- HIỆU ỨNG PHẢN ĐÒN & CHOÁNG ---
+    const now = Date.now();
+    
+    // Hiển thị chữ PARRY! trên đầu người chơi trong 1 giây sau khi phản đòn thành công
+    if (now - player.parryTime < 1000) {
+        ctx.fillStyle = '#ffeb3b';
+        ctx.font = 'bold 20px Arial';
+        ctx.textAlign = 'center';
+        // Hiệu ứng nảy nhẹ theo hàm sin
+        const bounceY = Math.sin((now - player.parryTime) * 0.01) * 8;
+        ctx.fillText('PARRY! ⚡', player.x, player.y - 150 + bounceY);
+        ctx.textAlign = 'left';
+    }
+
+    // Hiển thị chữ STUNNED 💫 trên đầu quái vật khi bị choáng
+    if (monster.isStunned && !monster.isDead) {
+        ctx.fillStyle = '#ff9800';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        // Hiệu ứng lắc lư nhẹ qua lại
+        const shakeX = Math.sin(now * 0.02) * 2;
+        ctx.fillText('STUNNED 💫', monster.x + shakeX, monster.y - 140);
+        ctx.textAlign = 'left';
+    }
+
+    // 4. Màn hình Game Over nếu Player chết
+    if (player.isDead) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = '#f44336';
+        ctx.font = 'bold 48px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 40);
+
+        ctx.fillStyle = 'white';
+        ctx.font = '24px Arial';
+        ctx.fillText(`Điểm số của bạn: ${player.score}`, canvas.width / 2, canvas.height / 2 + 10);
+
+        ctx.fillStyle = '#bbb';
+        ctx.font = '16px Arial';
+        ctx.fillText('Nhấn F5 để tải lại và chơi lại', canvas.width / 2, canvas.height / 2 + 50);
+        ctx.textAlign = 'left';
+    }
+}
+
+/**
+ * Vòng lặp chính của Game (Game Loop)
+ */
 function animate() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (imagesLoaded === totalImagesToLoad) {
-        // Draw map background
-        ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
-        
-        player.update();
-        player.draw(ctx);
+    if (assetManager.isAllLoaded()) {
+        // 1. Vẽ bản đồ nền (hiển thị phía sau menu mờ)
+        background.draw(ctx);
+
+        if (gameStarted) {
+            // 2. Cập nhật trạng thái của Player và Monster
+            player.update(input, groundY, canvas.width);
+            monster.update(player, groundY, canvas.width);
+
+            // 3. Xử lý tương tác va chạm chiến đấu
+            handleCombatCollisions(player, monster);
+
+            // 4. Vẽ các thực thể lên khung hình
+            player.draw(ctx);
+            monster.draw(ctx);
+
+            // 5. Vẽ HUD và Game Over
+            drawHUD(ctx, player, monster);
+        } else {
+            // Khi chưa nhấn bắt đầu: Chỉ vẽ tĩnh các nhân vật ở tư thế đứng yên (Idle)
+            player.draw(ctx);
+            monster.draw(ctx);
+        }
     } else {
+        // Màn hình chờ tải tài nguyên
         ctx.fillStyle = 'white';
         ctx.font = '20px Arial';
-        ctx.fillText(`Loading... ${imagesLoaded}/${totalImagesToLoad}`, canvas.width/2 - 50, canvas.height/2);
+        ctx.fillText(
+            `Loading... ${assetManager.loadedCount}/${assetManager.totalImages}`,
+            canvas.width / 2 - 50,
+            canvas.height / 2
+        );
     }
-    
+
     requestAnimationFrame(animate);
 }
 
+// Bắt đầu vòng lặp game
 animate();

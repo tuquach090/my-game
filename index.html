@@ -1,21 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Character Controller</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <canvas id="gameCanvas"></canvas>
-    <div id="controls">
-        <h3>Controls:</h3>
-        <p><b>A / D</b> or <b>Left / Right</b>: Move</p>
-        <p><b>Space</b>: Jump</p>
-        <p><b>Shift</b>: Run</p>
-        <p><b>Q / W / E</b>: Attack</p>
-        <p><b>S</b>: Defend / Protect</p>
+    <div id="startScreen">
+        <div class="menu-box">
+            <h1>KNIGHT ADVENTURE</h1>
+            <p class="subtitle">Đỡ đòn đúng lúc (Parry ⚡) để làm choáng quái vật!</p>
+            <button id="startButton">BẮT ĐẦU</button>
+            <div class="instructions-panel">
+                <h3>HƯỚNG DẪN ĐIỀU KHIỂN:</h3>
+                <ul>
+                    <li><b>A / D</b> hoặc <b>← / →</b>: Di chuyển</li>
+                    <li><b>Shift</b>: Chạy nhanh</li>
+                    <li><b>Space</b> hoặc <b>↑</b>: Nhảy</li>
+                    <li><b>Q / W / E</b>: Tấn công (Combo 1, 2, 3)</li>
+                    <li><b>S</b> hoặc <b>↓</b>: Đỡ đòn (Nhấn trước khi quái chém trúng để <b>PARRY ⚡</b>)</li>
+                </ul>
+            </div>
+        </div>
     </div>
+    <script src="src/AssetManager.js"></script>
+    <script src="src/InputHandler.js"></script>
+    <script src="src/Background.js"></script>
+    <script src="src/Character.js"></script>
+    <script src="src/Movement.js"></script>
+    <script src="src/Combat.js"></script>
+    <script src="src/Player.js"></script>
+    <script src="src/Monster.js"></script>
     <script src="script.js"></script>
 </body>
+
 </html>
